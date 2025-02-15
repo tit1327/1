@@ -1,0 +1,443 @@
+---
+title: "Drug and Alcohol induced Death in the United States shown Gender and Race"
+author: "Tiye Ngachoko"
+date: "2024-11-14"
+output: html_document
+---
+
+## Introduction  
+
+According to the National Institutes of Health (NIH), the United States experienced a staggering 104% increase in analgesic drug prescriptions, such as opioids, over recent years. This surge is part of a broader trend that has had significant public health implications, contributing to a rise in substance abuse and related fatalities.
+
+This project focuses on analyzing drug- and alcohol-induced mortality rates in the United States from 1999 to 2022, emphasizing race and gender as key variables. These demographic dimensions are closely tied to structural inequalities, cultural contexts, and access to resources, all of which can profoundly influence health outcomes. By understanding these connections, we can better appreciate how different populations are affected by substance use disorders and the subsequent mortality rates.
+
+Our variable of interest, **Crude Rate**, provides a standardized measure of mortality rates per 100,000 individuals, enabling direct comparisons across different races and genders. This rate helps normalize the data, making it easier to observe and analyze trends and disparities. 
+
+This study specifically seeks to answer several critical questions:
+- How do drug and alcohol-induced mortality rates differ across racial groups and genders?
+- What trends can be observed over time in these mortality rates?
+- Which demographic groups are most at risk?
+
+Through this comprehensive analysis, we aim to shed light on the complex interplay of race, gender, and substance-related mortality, ultimately contributing to more informed and equitable public health solutions.
+
+```{r warning=FALSE, echo=FALSE, include=FALSE}
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(plotly)
+library(collapsibleTree)
+
+```
+
+
+```{r warning=FALSE, echo=FALSE, include=FALSE}
+# Function to handle merging race categories
+merge_race_categories <- function(df) {
+  df <- df %>%
+    mutate(
+      # Create a new column with all 6 race categories
+      Race_All = Race,
+      # Combine "Native Hawaiian or Other Pacific Islander" with "Asian"
+      Race = case_when(
+        Race == "More than one race" ~ "Exclude",
+        Race == "Native Hawaiian or Other Pacific Islander" ~ "Asian",
+        Race == "Asian or Pacific Islander" ~ "Asian",
+        TRUE ~ Race
+      )
+    ) %>%
+    filter(Race != "Exclude")  # Exclude "More than one race"
+  
+  return(df)
+}
+```
+
+
+
+
+```{r main data, warning=FALSE, echo=FALSE, include=FALSE}
+library(dplyr)
+library(readr)
+
+# Read in the datasets
+data99.df <- read_delim("1999_2020.txt", delim = "\t", show_col_types = FALSE)
+data21.df <- read_delim("2021_2022.txt", delim = "\t", show_col_types = FALSE)
+
+# Apply transformations to data99.df
+data99.df <- data99.df %>%
+  mutate(
+    State = as.factor(State),
+    Race = as.factor(Race),
+    `Race Code` = as.factor(`Race Code`),
+    Gender = as.factor(Gender),
+    `Gender Code` = as.factor(`Gender Code`),
+    `MCD - Drug/Alcohol Induced Cause` = as.factor(`MCD - Drug/Alcohol Induced Cause`),
+    `MCD - Drug/Alcohol Induced Cause Code` = as.factor(`MCD - Drug/Alcohol Induced Cause Code`)
+  ) %>%
+  filter(`Crude Rate` != "Unreliable") %>%
+  select(-Notes)
+
+# Apply transformations to data21.df
+data21.df <- data21.df %>%
+  mutate(
+    State = as.factor(State),
+    `Single Race 6`= as.factor(`Single Race 6`),
+    Race = `Single Race 6`,
+    `Race Code` = `Single Race 6 Code`,
+    Race = as.factor(Race),
+    `Race Code` = as.factor(`Race Code`),
+    Gender = as.factor(Gender),
+    `Gender Code` = as.factor(`Gender Code`),
+    `MCD - Drug/Alcohol Induced Cause` = as.factor(`MCD - Drug/Alcohol Induced Cause`),
+    `MCD - Drug/Alcohol Induced Cause Code` = as.factor(`MCD - Drug/Alcohol Induced Cause Code`)
+  ) %>%
+  filter(`Crude Rate` != "Unreliable") %>%
+  select(-Notes)
+
+# Combine the regular datasets
+combined_data.df <- bind_rows(data99.df, data21.df) %>%
+  select(-`Single Race 6`, -`Single Race 6 Code`)
+
+combined_data.df<- na.omit(combined_data.df)
+combined_data.df<-merge_race_categories(combined_data.df)
+combined_data.df <- combined_data.df %>%
+  mutate(Race = as.factor(Race))
+combined_data.df <- combined_data.df %>% mutate(`Crude Rate` = as.numeric(`Crude Rate`))
+
+# # View the combined dataset
+# print(combined_data.df)
+# #str(combined_data.df)
+# 
+# 
+# # Get the first row of the combined dataset
+# first_row <- head(combined_data.df, n = 1)
+# # View the first row
+# print(first_row)
+
+```
+
+
+
+
+```{r sup data, warning=FALSE, echo=FALSE, include=FALSE}
+sup99.df <- read_delim("1999_2020sup.txt", delim = "\t", show_col_types = FALSE)
+sup21.df <- read_delim("2021_2022sup.txt", delim = "\t", show_col_types = FALSE)
+
+
+
+sup99.df <- sup99.df %>%
+  mutate(
+    State = as.factor(State),
+    Race = as.factor(Race),
+    `Race Code` = as.factor(`Race Code`),
+    Gender = as.factor(Gender),
+    `Gender Code` = as.factor(`Gender Code`),
+    `MCD - Drug/Alcohol Induced Cause` = as.factor(`MCD - Drug/Alcohol Induced Cause`),
+    `MCD - Drug/Alcohol Induced Cause Code` = as.factor(`MCD - Drug/Alcohol Induced Cause Code`)
+  ) %>%
+  select(-Notes)
+
+sup21.df <- sup21.df %>%
+  mutate(
+    Race = `Single Race 6`,
+    `Race Code` = `Single Race 6 Code`,
+    State = as.factor(State),
+    Race = as.factor(Race),
+    `Race Code` = as.factor(`Race Code`),
+    Gender = as.factor(Gender),
+    `Gender Code` = as.factor(`Gender Code`),
+    `MCD - Drug/Alcohol Induced Cause` = as.factor(`MCD - Drug/Alcohol Induced Cause`),
+    `MCD - Drug/Alcohol Induced Cause Code` = as.factor(`MCD - Drug/Alcohol Induced Cause Code`)
+  ) %>%
+  select(-Notes)
+
+combined_sup.df <- bind_rows(sup99.df, sup21.df)
+combined_sup.df<- merge_race_categories(combined_sup.df)
+
+combined_sup.df <- combined_sup.df %>%
+  mutate(Race = as.factor(Race))
+
+combined_sup.df <- combined_sup.df %>% mutate(`Crude Rate` = as.numeric(`Crude Rate`))
+
+#print(combined_sup.df)
+
+```
+
+## Methods  
+
+### Goal  
+This study aims to explore drug- and alcohol-induced mortality rates, focusing on the explanatory variable **Crude Rate** and its relationship to key demographic dimensions: **Race**, **Gender**, **State** overtime. Below, we outline the data preparation and analytical approaches used to achieve this goal.  
+
+### Data Preparation  
+
+The combined datasets, spanning 1999–2020 and 2021–2022, provide a comprehensive foundation for analysis. These datasets include demographic information such as race, gender, state, cause of death, and crude rates. To ensure consistency and relevance in the analysis, the following preprocessing steps were undertaken:  
+
+1. **Filtering Unreliable Data**  
+   Rows with crude rates labeled as "Unreliable" or "Suppressed" were removed to maintain data accuracy and reliability.  
+
+2. **Merging Race Categories**  
+   - The category "Native Hawaiian or Other Pacific Islander" was merged into the "Asian" category. This adjustment accounts for the fact that this group was only separated in the later dataset, ensuring consistency across the full timeline of 1999-2022.  
+   - The "More than one race" category was excluded, as it was only available in the newer dataset (2021–2022). Including it would provide an incomplete narrative due to its limited temporal scope.  
+
+3. **Removing Unnecessary Columns**  
+   Columns not relevant to the analysis, such as notes and redundant identifiers, were dropped to streamline the dataset.  
+
+4. **Handling Missing Values**  
+   Missing values were removed using the `na.omit()` function to ensure that all analyses were conducted on complete cases, avoiding potential biases from imputation.  
+
+### Key Metrics  
+
+The primary variable of interest is the **Crude Rate**, a standardized measure of drug- and alcohol-induced mortality rates per 100,000 people. The demographic dimensions include:  
+- **Race**: Adjusted categories include Asian (inclusive of Native Hawaiian and Pacific Islander), Black or African American, White, and American Indian or Alaska Native.  
+- **Gender**: Male and Female.  
+- **State**: Geographic representation within the United States.  
+- **Year**: Temporal range from 1999 to 2022.  
+
+### Statistical Techniques  
+
+The analysis employed the following methods to explore patterns and disparities in the data:  
+- **Group-Wise Summaries**: Mortality rates were summarized by race, gender, and year to identify patterns and disparities.  
+- **Trends Over Time**: Temporal trends in crude rates were analyzed to understand changes across demographic groups.  
+- **Comparative Analysis**: Differences between racial and gender groups were examined to highlight disparities.  
+
+These techniques were selected to ensure a robust exploration of the relationships between demographic factors and mortality rates.  
+
+### Visualization Tools  
+
+Dynamic figures were created within this R Markdown file using R’s `ggplot2` and `plotly` packages. These visualizations include:  
+- Grouped bar charts to compare crude rates across races and genders.  
+- Line charts to illustrate temporal trends in mortality rates.  
+- Box plots to summarize crude rate distributions by race and gender.  
+
+### Addressing Suppressed Data  
+
+Suppressed data points, typically used to protect confidentiality when numbers are too small, were excluded from the analysis to ensure accuracy and consistency. By focusing on reliable and complete data, this approach minimizes potential misrepresentation.  
+
+Through this structured preprocessing and analytical approach, we aim to uncover meaningful insights into the disparities and trends in drug- and alcohol-induced mortality rates.  
+
+
+
+
+## Analysis
+
+### Assessing the Impact of Data Cleaning
+
+First, as previously mentioned, to ensure the integrity of our findings, we started by evaluating whether the cleaning process—specifically, the removal of unreliable and suppressed data—introduced any significant bias into our analysis. This initial analysis compares the distributions of the primary explanatory variable, *Crude Rate* (drug and alcohol-induced deaths), between the cleaned dataset (`combined_data.df`) and the suppressed dataset (`combined_sup.df`).
+
+***Methods***
+
+Two complementary approaches were employed to assess the impact of data cleaning:
+1. **Kolmogorov-Smirnov (KS) Test**:
+   - A non-parametric statistical test was used to compare the distributions of *Crude Rate* in the cleaned and suppressed datasets.
+   - The null hypothesis (H₀) states that the distributions of *Crude Rate* in both datasets are identical.
+2. **Visual Comparison**:
+   - Density plots were generated to provide a visual assessment of the distributions.
+
+```{r warning=FALSE, echo=FALSE, include=FALSE}
+# Calculate summary statistics for both datasets
+summary_cleaned <- combined_data.df %>%
+  group_by(Race, Gender) %>%
+  summarize(
+    mean_rate = mean(`Crude Rate`, na.rm = TRUE),
+    median_rate = median(`Crude Rate`, na.rm = TRUE),
+    sd_rate = sd(`Crude Rate`, na.rm = TRUE)
+  )
+
+summary_suppressed <- combined_sup.df %>%
+  group_by(Race, Gender) %>%
+  summarize(
+    mean_rate = mean(`Crude Rate`, na.rm = TRUE),
+    median_rate = median(`Crude Rate`, na.rm = TRUE),
+    sd_rate = sd(`Crude Rate`, na.rm = TRUE)
+  )
+
+# Merge summaries for comparison
+summary_comparison <- merge(
+  summary_cleaned, summary_suppressed,
+  by = c("Race", "Gender"),
+  suffixes = c("_cleaned", "_suppressed")
+)
+
+#print(summary_comparison)
+
+ks_test <- ks.test(
+  combined_data.df$`Crude Rate`,
+  combined_sup.df$`Crude Rate`
+)
+#print(ks_test)
+```
+
+***Kolmogorov-Smirnov Test***
+- **D-statistic**: 0.010988  
+- **p-value**: 0.2278  
+- **Conclusion**: The p-value exceeds the common significance level of 0.05, indicating no statistically significant difference between the two distributions. Thus, we fail to reject the null hypothesis, confirming that the distributions of *Crude Rate* are not significantly affected by the data cleaning process.
+
+
+** Visual Comparison**
+```{r warning=FALSE, echo=FALSE}
+ggplot() +
+  geom_density(data = combined_data.df, aes(x = `Crude Rate`, fill = "Cleaned"), alpha = 0.5) +
+  geom_density(data = combined_sup.df, aes(x = `Crude Rate`, fill = "Suppressed"), alpha = 0.5) +
+  labs(title = "Density Comparison of Crude Rate", x = "Crude Rate", y = "Density") +
+  scale_fill_manual(values = c("Cleaned" = "blue", "Suppressed" = "red")) +
+  theme_minimal()
+
+```
+
+- **Overlapping Distributions**: The density plots for the cleaned and suppressed datasets exhibit significant overlap, further supporting the KS test results.  
+- **Peaks and Spread**: Both distributions share similar peaks and spreads, suggesting that the overall patterns and trends in the data remain consistent between the datasets.
+
+***Discussion***
+
+The results from both the KS test and density plot corroborate that the data cleaning process did not introduce significant biases or alter the overall distribution of *Crude Rate*. This finding is critical, as it validates the integrity of the cleaned dataset for subsequent analyses. The removal of suppressed and unreliable data ensures analytical clarity while preserving the representatives of the trends. By demonstrating that the cleaned dataset is statistically comparable to the suppressed dataset, we can proceed with confidence in exploring the relationships between *Crude Rate* and race and gender.
+
+
+### Analysis of Drug and Alcohol-Related Deaths by Race and Gender (1999–2022)
+
+**Methods**
+
+This analysis examines the trends in the average crude rate of drug and alcohol-related deaths across racial groups and genders from 1999 to 2022. 
+
+The plot uses the following key variables:  
+- **`Year Code`**: The year of the observation.  
+- **`Race`**: The racial category of the population group.  
+- **`Gender`**: Gender classification of the observed group.  
+- **`Crude Rate`**: The crude rate of drug and alcohol-related deaths per 100,000 population.  
+
+To analyze these data, the crude rates were grouped by year, race, and gender, and the mean crude rate was calculated for each grouping.  
+
+A scatter plot was created using the `ggplot2` package to visualize these trends. Specific features of the plot include:  
+- **Faceting by Race**: Each racial group is presented in a separate panel for clear comparisons.  
+- **Color-coded Gender**: Mint green for males and pink for females to differentiate gender groups.  
+- **Size of Points**: Represents the magnitude of the average crude rate.  
+
+```{r warning=FALSE, echo=FALSE}
+summary_df <- combined_data.df %>%
+  group_by(`Year Code`, Race, Gender) %>%
+  summarize(Average_Crude_Rate = mean(`Crude Rate`, na.rm = TRUE), .groups = 'drop')
+
+# Custom color palette
+gender_colors <- c("Male" = "#98FF98", "Female" = "pink")  # Mint green and pink
+
+# Create the scatter plot with vertical lines
+p <- ggplot(summary_df, aes(x = `Year Code`, y = Average_Crude_Rate, size = Average_Crude_Rate, color = Gender)) +
+  geom_point(alpha = 0.7, show.legend = TRUE) +
+  geom_vline(aes(xintercept = `Year Code`), color = "gray80", linetype = "dotted", size = 0.5) +  # Add vertical lines
+  facet_wrap(~ Race) +
+  scale_color_manual(values = gender_colors) +  # Apply custom colors
+  labs(
+    x = "Year",
+    y = "Average Crude Rate",
+    title = "Average Crude Rate of Drug and Alcohol-related Deaths Grouped by Race and Gender",
+    color = "Gender",
+    size = "Average Crude Rate"
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  )
+
+print(p)
+
+```
+
+
+### Observations
+
+- **Gender Disparities**: Males generally exhibit higher average *Crude Rates* of drug and alcohol-related deaths than females across all racial groups.
+- **Racial Disparities**: Native American and Alaskan Native Populations display significantly higher *Crude Rates* compared to other racial groups. Black and White Populations show similar trends in moderate crude rates, with a larger spike in the black/African American population in 2021. Finally, the Asian Population displays the lowest crude rates, indicating a comparatively lower impact of alcohol and drug-related mortality..
+- **Temporal Trends**: We see smaller gender gaps in the early 2000s. Across all groups, the general trend is that rates of drug and alcohol related deaths has risen over time, some fluctuations in *Crude Rate* are observed over the years, which may be influenced by broader socio-economic factors, policies, or public health interventions.
+
+### Discussion
+
+This analysis highlights notable demographic disparities in drug and alcohol-related deaths:
+
+1. **Gender Patterns**: The consistent gender gap underscores the need for targeted interventions addressing male populations.
+2. **Racial Disparities**: The disproportionately high rates among Native American and Alaskan Native populations warrant further exploration into systemic factors and tailored support programs.
+
+
+## Analysis of MCD - Drug/Alcohol Induced Cause by Race and Gender (1999–2022)
+
+### Methods
+
+For this section, we analyzed the average crude rates of drug and alcohol-related deaths across racial groups, genders, using causes of death. The dataset spans the years 1999 to 2022, and the plot is faceted by race, with color used to represent specific causes and shape used to denote gender. 
+
+Temporal patterns are displayed along the x-axis, while crude rates are shown on the y-axis. 
+
+The visualization was generated using `ggplot2` and `plotly`, allowing for an interactive exploration of the data. The code first groups and summarizes the data by year, race, gender, and cause of death. Average crude rates were calculated for each subgroup, excluding missing values. A `viridis` color scale was used to enhance visual clarity, and the interactive nature of the plot enables deeper exploration of trends across these dimensions.
+
+```{r warning=FALSE, echo=FALSE}
+summary_df <- combined_data.df %>%
+  group_by(`Year Code`, Race, Gender, `MCD - Drug/Alcohol Induced Cause`) %>%
+  summarize(Average_Crude_Rate = mean(`Crude Rate`, na.rm = TRUE), .groups = 'drop')
+
+gg <- ggplot(summary_df, aes(x = `Year Code`, y = Average_Crude_Rate, color = `MCD - Drug/Alcohol Induced Cause`, shape = Gender)) +
+  geom_point(alpha = 0.7, size = 1.75) +
+  facet_wrap(~ Race) +
+  scale_color_viridis_d(option = "C") +
+  labs(
+    x = "Year",
+    y = "Average Crude Rate",
+    title = "Interactive Plot of Drug and Alcohol-related Deaths",
+    color = "Cause",
+    shape = "Gender"
+  ) +
+  theme_minimal()
+
+ggplotly(gg)
+
+```
+
+
+
+
+### Observations
+
+**Persistent Disparities by Race**
+- Native populations exhibit consistently higher rates of alcohol- and drug-related deaths compared to other racial groups. This finding aligns with existing literature documenting significant health inequities in these communities.
+
+**Gender-Specific Patterns**
+Gender differences remain consistent to the previous plots. This version does highlight the higher number of Males dying of `All other alcohol-induced causes`.
+
+**Cause-Specific Trends**
+The top three causes of death were**“All other alcohol-induced causes”, “All other drug-induced causes”, and “Drug poisonings (overdose), unintentional”**. Causes such as `Drug Poisoning (Homicide)` and `Drug Poisoning (Suicide)` had comparatively lower rates.
+
+**Temporal Trends**
+Over the study period (1999–2022), fluctuations in crude rates reveal important temporal patterns:
+- Certain years show significant spikes in crude rates, potentially linked to societal events or public health crises (e.g., peaks in opioid-related deaths).
+- The most recent years suggest a plateau or slight decline in some racial groups, reflecting potential improvements in public health interventions or data collection.
+
+
+### Discussion
+
+This analysis underscores the ongoing public health challenge of drug- and alcohol-related mortality in the United States. The findings highlight critical racial and gender disparities, with Native populations disproportionately affected and males experiencing consistently higher rates than females. These disparities reflect deep-seated structural inequities and emphasize the need for targeted interventions.
+
+#### Limitations
+- **Broad racial categories**: Grouping diverse populations into simplified racial categories (e.g., “Native,” “White”) may mask within-group variability.
+- **Aggregated metrics**: Averaging crude rates by year and subgroup may overlook more granular trends.
+
+#### Future Directions
+To build on this analysis, future studies should:
+
+- Incorporate socioeconomic and geographic factors to assess additional contributors to disparities.
+- Examine the effectiveness of existing interventions and public health campaigns targeting specific causes of death.
+
+
+### Conclusion
+
+In conclusion, the analysis of drug and alcohol-related deaths from 1999 to 2022 highlights persistent disparities in mortality rates across racial groups, genders. It also displays which causes of death within the dataset are most prevalent. Native populations, in particular, exhibit disproportionately high rates, emphasizing the need for culturally tailored prevention and intervention strategies. Further, Males exhibited higher crude rates than their Female counterparts. Additionally, the overall leading causes of death were unintentional drug poisonings, alcohol-related causes, and other drug-induced conditions—remain key areas for public health action.
+
+The findings reinforce the importance of addressing the root causes of these disparities, including systemic inequities, access to healthcare, and cultural barriers to treatment. By illuminating these patterns, this analysis provides a foundation for informed public health strategies aimed at reducing preventable deaths and improving health equity nationwide.
+
+
+
+**References:**
+
+https://pmc.ncbi.nlm.nih.gov/articles/PMC3955827/#:~:text=The%20estimated%20total%20number%20of,11.2%E2%80%9312.4
+
+https://www.ncbi.nlm.nih.gov/books/NBK458661/
+
+https://americanaddictioncenters.org/addiction-statistics/native-americans 
+
